@@ -6,89 +6,30 @@ import (
 	"strings"
 )
 
-type node struct {
-	path     string
-	body     *Route
-	children []*node
-}
-
-func newNode(path string) *node {
-	return &node{
-		path:     path,
-		body:     nil,
-		children: nil,
-	}
-}
-
-func (n *node) addRoute(method string, h *Handler) error {
-	if n.body != nil {
-		handler := n.body.handler[method]
-		if handler != nil {
-			return errors.New("method defined")
-		}
-		n.body.add(method, h)
-		return nil
-	}
-
-	r := newRoute()
-	r.add(method, h)
-	n.body = r
-	return nil
-}
-
-func (n *node) addChild(child *node) *node {
-	n.children = append(n.children, child)
-	return n
-}
-
-func (n *node) haveChild(path string) *node {
-	for _, child := range n.children {
-		if child.path == path {
-			return child
-		}
-	}
-	return nil
-}
-
-func (n *node) search(path string) *node {
-	current, next := split(path)
-	if current == n.path && next == "" {
-		return n
-	}
-	child, remain := split(next)
-	for idx := 0; idx < len(n.children); idx++ {
-		if child == n.children[idx].path {
-			if remain == "" {
-				return n.children[idx]
-			}
-			return n.children[idx].search(next)
-		}
-	}
-	return nil
-}
-
-func (n node) getHandler(method string) *Handler {
-	return n.body.handler[method]
-}
+var (
+	ErrorRouteNotFound = errors.New("route not found")
+)
 
 type tree struct {
 	root *node
 
 	routeNotFound *node
+
+	middlewares []*Handler
 }
 
 //var Tree *tree
 
 func newTree() *tree {
-	r := newRoute()
-	var rnf Handler = func(r *http.Request) {}
-	r.add("*", &rnf)
+	var rnf Handler = func(r *http.Request) error {
+		return ErrorRouteNotFound
+	}
+
+	n := newNode("*")
+	_ = n.addRoute("*", &rnf)
+
 	tree := &tree{
-		routeNotFound: &node{
-			path:     "*",
-			body:     r,
-			children: nil,
-		},
+		routeNotFound: n,
 	}
 	return tree
 }
@@ -146,12 +87,25 @@ func (t *tree) AddHandler(method string, path string, h Handler) error {
 func (t *tree) Match(r *http.Request) Handler {
 	path := r.URL.Path
 	node := t.root.search(path)
-	if node == nil {
+	if node == nil || !node.isAvailable() {
 		return *t.routeNotFound.getHandler("*")
 	}
 	return *node.getHandler(r.Method)
 }
 
+func (t *tree) DisablePath(path string) {
+	node := t.root.search(path)
+	if node != nil {
+		node.unavailableNode()
+	}
+}
+
+func (t *tree) EnablePath(path string) {
+	node := t.root.search(path)
+	if node != nil {
+		node.availableNode()
+	}
+}
 func split(path string) (string, string) {
 	p := strings.Split(path, "/")
 	if len(p) == 0 {

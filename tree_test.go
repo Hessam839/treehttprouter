@@ -1,7 +1,9 @@
 package treehttprouter
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"net/http"
 	"testing"
 )
@@ -23,7 +25,7 @@ func TestSplit(t *testing.T) {
 func TestTree(t *testing.T) {
 	tree := newTree()
 
-	var v1 Handler = func(r *http.Request) {}
+	var v1 Handler = func(r *http.Request) error { return nil }
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
 		t.Fatalf("cant create handler: %v", err)
 	}
@@ -50,7 +52,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestNodeSearch(t *testing.T) {
-	var v1 Handler = func(r *http.Request) {}
+	var v1 Handler = func(r *http.Request) error { return nil }
 
 	n3 := newNode("admin")
 	err := n3.addRoute("GET", &v1)
@@ -78,34 +80,7 @@ func TestNodeSearch(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	tree := newTree()
-
-	var v1 Handler = func(r *http.Request) {}
-	if err := tree.AddHandler("GET", "/", v1); err != nil {
-		t.Fatalf("cant create handler: %v", err)
-	}
-
-	if err := tree.AddHandler("GET", "/api/v1/users", v1); err != nil {
-		t.Fatalf("cant create handler %v", err)
-	}
-
-	if err := tree.AddHandler("POST", "/api/v1/users", v1); err != nil {
-		t.Fatalf("cant create handler %v", err)
-	}
-
-	if err := tree.AddHandler("PUT", "/api/v1/users", v1); err != nil {
-		t.Fatalf("cant create handler %v", err)
-	}
-
-	if err := tree.AddHandler("GET", "/api/v1/products", v1); err != nil {
-		t.Fatalf("cant create handler %v", err)
-	}
-
-	if err := tree.AddHandler("POST", "/api/v1/products", func(r *http.Request) {
-		t.Logf("incoming req path: %v", r.URL.Path)
-	}); err != nil {
-		t.Fatalf("cant create handler %v", err)
-	}
+	tree, _ := CreateTree()
 
 	req, err := http.NewRequest("POST", "/api/v1/products", nil)
 	if err != nil {
@@ -113,5 +88,75 @@ func TestMatch(t *testing.T) {
 	}
 
 	handler := tree.Match(req)
-	handler(req)
+	assert.NotNil(t, handler)
+
+	err = handler(req)
+	if err != nil {
+		t.Fatalf("handler match error: %v", err)
+	}
+}
+
+func TestDisableRoute(t *testing.T) {
+	tree, _ := CreateTree()
+
+	tree.DisablePath("/api/v1/users")
+
+	req, rer := http.NewRequest("POST", "/api/v1/users", nil)
+	if rer != nil {
+		t.Fatalf("with error: %v", rer)
+	}
+
+	handler := tree.Match(req)
+	assert.NotNil(t, handler)
+	err := handler(req)
+	assert.ErrorIs(t, err, ErrorRouteNotFound)
+}
+
+func CreateTree() (*tree, error) {
+	tree := newTree()
+
+	var v1 Handler = func(r *http.Request) error { return nil }
+	if err := tree.AddHandler("GET", "/", v1); err != nil {
+		return nil, fmt.Errorf("cant create handler: %v", err)
+	}
+
+	if err := tree.AddHandler("GET", "/api/v1/users", v1); err != nil {
+		return nil, fmt.Errorf("cant create handler %v", err)
+	}
+
+	if err := tree.AddHandler("POST", "/api/v1/users", v1); err != nil {
+		return nil, fmt.Errorf("cant create handler %v", err)
+	}
+
+	if err := tree.AddHandler("PUT", "/api/v1/users", v1); err != nil {
+		return nil, fmt.Errorf("cant create handler %v", err)
+	}
+
+	if err := tree.AddHandler("GET", "/api/v1/products", v1); err != nil {
+		return nil, fmt.Errorf("cant create handler %v", err)
+	}
+
+	if err := tree.AddHandler("POST", "/api/v1/products", func(r *http.Request) error {
+		log.Printf("incoming req path: %v", r.URL.Path)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("cant create handler %v", err)
+	}
+
+	return tree, nil
+}
+
+func BenchmarkTree(b *testing.B) {
+	tree, _ := CreateTree()
+
+	tree.DisablePath("/api/v1/users")
+
+	req, rer := http.NewRequest("POST", "/api/v1/users", nil)
+	if rer != nil {
+		b.Fatalf("with error: %v", rer)
+	}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = tree.Match(req)
+	}
 }

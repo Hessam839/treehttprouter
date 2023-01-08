@@ -3,14 +3,13 @@ package treehttprouter
 import (
 	"errors"
 	"net/http"
-	"strings"
 )
 
 var (
 	ErrorRouteNotFound = errors.New("route not found")
 )
 
-type tree struct {
+type MuxTree struct {
 	root *node
 
 	routeNotFound *node
@@ -18,9 +17,9 @@ type tree struct {
 	middlewares []*Handler
 }
 
-//var Tree *tree
+//var Tree *MuxTree
 
-func newTree() *tree {
+func NewMux() *MuxTree {
 	var rnf Handler = func(r *http.Request) error {
 		return ErrorRouteNotFound
 	}
@@ -28,13 +27,14 @@ func newTree() *tree {
 	n := newNode("*")
 	_ = n.addRoute("*", &rnf)
 
-	tree := &tree{
+	tree := &MuxTree{
 		routeNotFound: n,
+		middlewares:   make([]*Handler, 0),
 	}
 	return tree
 }
 
-func (t *tree) AddHandler(method string, path string, h Handler) error {
+func (t *MuxTree) AddHandler(method string, path string, h Handler) error {
 	current, next := split(path)
 
 	if current == "/" && next == "" {
@@ -84,7 +84,7 @@ func (t *tree) AddHandler(method string, path string, h Handler) error {
 	}
 }
 
-func (t *tree) Match(r *http.Request) Handler {
+func (t *MuxTree) match(r *http.Request) Handler {
 	path := r.URL.Path
 	node := t.root.search(path)
 	if node == nil || !node.isAvailable() {
@@ -93,26 +93,31 @@ func (t *tree) Match(r *http.Request) Handler {
 	return *node.getHandler(r.Method)
 }
 
-func (t *tree) DisablePath(path string) {
+func (t *MuxTree) DisablePath(path string) {
 	node := t.root.search(path)
 	if node != nil {
 		node.unavailableNode()
 	}
 }
 
-func (t *tree) EnablePath(path string) {
+func (t *MuxTree) EnablePath(path string) {
 	node := t.root.search(path)
 	if node != nil {
 		node.availableNode()
 	}
 }
-func split(path string) (string, string) {
-	p := strings.Split(path, "/")
-	if len(p) == 0 {
-		return "/", ""
+
+func (t *MuxTree) Use(handler Handler) {
+	t.middlewares = append(t.middlewares, &handler)
+}
+
+func (t *MuxTree) Serve(r *http.Request) error {
+	handler := t.match(r)
+	for _, middleware := range t.middlewares {
+		h := *middleware
+		if err := h(r); err != nil {
+			return err
+		}
 	}
-	if p[0] == "" {
-		return "/", strings.Join(p[1:], "/")
-	}
-	return p[0], strings.Join(p[1:], "/")
+	return handler(r)
 }

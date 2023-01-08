@@ -1,6 +1,9 @@
 package treehttprouter
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"log"
@@ -23,7 +26,7 @@ func TestSplit(t *testing.T) {
 }
 
 func TestTree(t *testing.T) {
-	tree := newTree()
+	tree := NewMux()
 
 	var v1 Handler = func(r *http.Request) error { return nil }
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
@@ -87,7 +90,7 @@ func TestMatch(t *testing.T) {
 		t.Fatalf("with error: %v", err)
 	}
 
-	handler := tree.Match(req)
+	handler := tree.match(req)
 	assert.NotNil(t, handler)
 
 	err = handler(req)
@@ -106,14 +109,41 @@ func TestDisableRoute(t *testing.T) {
 		t.Fatalf("with error: %v", rer)
 	}
 
-	handler := tree.Match(req)
+	handler := tree.match(req)
 	assert.NotNil(t, handler)
 	err := handler(req)
 	assert.ErrorIs(t, err, ErrorRouteNotFound)
 }
 
-func CreateTree() (*tree, error) {
-	tree := newTree()
+func TestMiddleware(t *testing.T) {
+	tree, _ := CreateTree()
+
+	tree.Use(func(r *http.Request) error {
+		if r.Proto != "HTTP/1.1" {
+			return errors.New("protocol mismatch")
+		}
+		return nil
+	})
+
+	tree.Use(func(r *http.Request) error {
+		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
+			return errors.New("codec error")
+		}
+		return nil
+	})
+
+	req, rer := http.NewRequest("PUT", "/api/v1/users", bytes.NewReader([]byte(`{"name":"Hessam","age":42}`)))
+	if rer != nil {
+		t.Fatalf("with error: %v", rer)
+	}
+	req.Header.Add("X-Content-Type-Options", "JSONP")
+
+	err := tree.Serve(req)
+	t.Logf("error is: %v", err)
+}
+
+func CreateTree() (*MuxTree, error) {
+	tree := NewMux()
 
 	var v1 Handler = func(r *http.Request) error { return nil }
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
@@ -128,7 +158,15 @@ func CreateTree() (*tree, error) {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
-	if err := tree.AddHandler("PUT", "/api/v1/users", v1); err != nil {
+	if err := tree.AddHandler("PUT", "/api/v1/users", func(r *http.Request) error {
+		user := &User{}
+
+		if err := json.NewDecoder(r.Body).Decode(user); err != nil {
+			return err
+		}
+		log.Printf("user request: %+v", user)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
@@ -146,8 +184,27 @@ func CreateTree() (*tree, error) {
 	return tree, nil
 }
 
+type User struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
 func BenchmarkTree(b *testing.B) {
 	tree, _ := CreateTree()
+
+	tree.Use(func(r *http.Request) error {
+		if r.Proto != "HTTP1.1" {
+			return errors.New("protocol mismatch")
+		}
+		return nil
+	})
+
+	tree.Use(func(r *http.Request) error {
+		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
+			return errors.New("codec error")
+		}
+		return nil
+	})
 
 	tree.DisablePath("/api/v1/users")
 
@@ -157,6 +214,6 @@ func BenchmarkTree(b *testing.B) {
 	}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = tree.Match(req)
+		_ = tree.Serve(req)
 	}
 }

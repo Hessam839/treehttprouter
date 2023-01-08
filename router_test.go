@@ -14,12 +14,12 @@ func TestNewRouter(t *testing.T) {
 func TestAddHandler(t *testing.T) {
 	r := newRoute()
 
-	var h1 Handler = func(r *http.Request) {}
-	var h2 Handler = func(r *http.Request) {}
+	var h1 Handler = func(r *http.Request) error { return nil }
+	var h2 Handler = func(r *http.Request) error { return nil }
 
-	r.add("GET", &h1)
+	_ = r.addHandler("GET", &h1)
 
-	r.add("POST", &h2)
+	_ = r.addHandler("POST", &h2)
 
 	tr := &Route{
 		handler: map[string]*Handler{

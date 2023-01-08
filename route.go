@@ -1,8 +1,16 @@
 package treehttprouter
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+	"strings"
+)
 
-type Handler func(r *http.Request)
+var (
+	MethodError = errors.New("wrong method")
+)
+
+type Handler func(r *http.Request) error
 
 type Route struct {
 	handler map[string]*Handler
@@ -14,23 +22,59 @@ func newRoute() *Route {
 	}
 }
 
-func (r *Route) add(method string, h *Handler) *Route {
-	r.handler[method] = h
-	return r
+func (r *Route) haveMethod(method string) bool {
+	return r.handler[method] != nil
 }
 
-func (r Route) get(h *Handler) {
-	r.add("GET", h)
+func (r *Route) addHandler(method string, h *Handler) error {
+	m := strings.ToUpper(method)
+
+	switch m {
+	case "GET":
+		r.get(h)
+	case "POST":
+		r.post(h)
+	case "PUT":
+		r.put(h)
+	case "DELETE":
+		r.delete(h)
+	case "HEAD":
+		r.head(h)
+	case "OPTION":
+		r.option(h)
+	case "*":
+		r.global(h)
+	default:
+		return MethodError
+	}
+
+	return nil
 }
 
-func (r Route) post(h *Handler) {
-	r.add("POST", h)
+func (r *Route) get(h *Handler) {
+	r.handler["GET"] = h
 }
 
-func (r Route) put(h *Handler) {
-	r.add("PUT", h)
+func (r *Route) post(h *Handler) {
+	r.handler["POST"] = h
 }
 
-func (r Route) delete(h *Handler) {
-	r.add("DELETE", h)
+func (r *Route) put(h *Handler) {
+	r.handler["PUT"] = h
+}
+
+func (r *Route) delete(h *Handler) {
+	r.handler["DELETE"] = h
+}
+
+func (r *Route) head(h *Handler) {
+	r.handler["HEAD"] = h
+}
+
+func (r *Route) option(h *Handler) {
+	r.handler["OPTION"] = h
+}
+
+func (r *Route) global(h *Handler) {
+	r.handler["*"] = h
 }

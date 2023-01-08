@@ -14,6 +14,8 @@ type MuxTree struct {
 
 	routeNotFound *node
 
+	methodNotAllowed *node
+
 	middlewares []*Handler
 }
 
@@ -27,9 +29,17 @@ func NewMux() *MuxTree {
 	n := newNode("*")
 	_ = n.addRoute("*", &rnf)
 
+	var mnf Handler = func(r *http.Request) error {
+		return ErrorMethodNotAllowed
+	}
+
+	n1 := newNode("*")
+	_ = n1.addRoute("*", &mnf)
+
 	tree := &MuxTree{
-		routeNotFound: n,
-		middlewares:   make([]*Handler, 0),
+		routeNotFound:    n,
+		methodNotAllowed: n1,
+		middlewares:      make([]*Handler, 0),
 	}
 	return tree
 }
@@ -37,17 +47,29 @@ func NewMux() *MuxTree {
 func (t *MuxTree) AddHandler(method string, path string, h Handler) error {
 	current, next := split(path)
 
-	if current == "/" && next == "" {
-		if t.root == nil {
-			node := newNode(path)
-			_ = node.addRoute(method, &h)
-			t.root = node
-
+	if t.root == nil {
+		node := newNode(current)
+		t.root = node
+		if next == "" {
+			if err := node.addRoute(method, &h); err != nil {
+				return err
+			}
 			return nil
 		}
-		return errors.New("root route defined")
 	}
-
+	//if current == "/" && next == "" {
+	//	if t.root == nil {
+	//		node := newNode(path)
+	//		err := node.addRoute(method, &h)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		t.root = node
+	//
+	//		return nil
+	//	}
+	//	return errors.New("root route defined")
+	//}
 	currentNode := t.root
 	child, remain := split(next)
 	for {
@@ -88,9 +110,15 @@ func (t *MuxTree) match(r *http.Request) Handler {
 	path := r.URL.Path
 	node := t.root.search(path)
 	if node == nil || !node.isAvailable() {
-		return *t.routeNotFound.getHandler("*")
+		handler, _ := t.routeNotFound.getHandler("*")
+		return *handler
 	}
-	return *node.getHandler(r.Method)
+	handler, err := node.getHandler(r.Method)
+	if err != nil {
+		h, _ := t.methodNotAllowed.getHandler("*")
+		return *h
+	}
+	return *handler
 }
 
 func (t *MuxTree) DisablePath(path string) {
@@ -120,4 +148,9 @@ func (t *MuxTree) Serve(r *http.Request) error {
 		}
 	}
 	return handler(r)
+}
+
+func (t *MuxTree) Mount(path string, tree *MuxTree) {
+	node := t.root.search(path)
+	node.addChild(tree.root)
 }

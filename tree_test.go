@@ -80,6 +80,7 @@ func TestNodeSearch(t *testing.T) {
 	assert.NotNil(t, nde)
 	nde = n1.search("/api/v1/user")
 	assert.Nil(t, nde)
+	nde = n1.search("/api/v1")
 }
 
 func TestMatch(t *testing.T) {
@@ -139,6 +140,35 @@ func TestMiddleware(t *testing.T) {
 	req.Header.Add("X-Content-Type-Options", "JSONP")
 
 	err := tree.Serve(req)
+	t.Logf("error is: %v", err)
+}
+
+func TestMountTree(t *testing.T) {
+	tree1, _ := CreateTree()
+
+	tree2 := NewMux()
+	if err := tree2.AddHandler("GET", "v2/users", func(r *http.Request) error {
+		log.Println("Hello from v2/users")
+		return nil
+	}); err != nil {
+		t.Fatalf("add route handler: %v", err)
+	}
+	if err := tree2.AddHandler("*", "v2/products", nil); err != nil {
+		t.Fatalf("add route handler: %v", err)
+	}
+	if err := tree2.AddHandler("*", "v2/comments", nil); err != nil {
+		t.Fatalf("add route handler: %v", err)
+	}
+
+	tree1.Mount("/api", tree2)
+
+	req, rer := http.NewRequest("PUT", "/api/v2/users", bytes.NewReader([]byte(`{"name":"Hessam","age":42}`)))
+	if rer != nil {
+		t.Fatalf("with error: %v", rer)
+	}
+	req.Header.Add("X-Content-Type-Options", "JSONP")
+
+	err := tree1.Serve(req)
 	t.Logf("error is: %v", err)
 }
 
@@ -208,7 +238,23 @@ func BenchmarkTree(b *testing.B) {
 
 	tree.DisablePath("/api/v1/users")
 
-	req, rer := http.NewRequest("POST", "/api/v1/users", nil)
+	tree2 := NewMux()
+	if err := tree2.AddHandler("GET", "v2/users", func(r *http.Request) error {
+		log.Println("Hello from v2/users")
+		return nil
+	}); err != nil {
+		b.Fatalf("add route handler: %v", err)
+	}
+	if err := tree2.AddHandler("*", "v2/products", nil); err != nil {
+		b.Fatalf("add route handler: %v", err)
+	}
+	if err := tree2.AddHandler("*", "v2/comments", nil); err != nil {
+		b.Fatalf("add route handler: %v", err)
+	}
+
+	tree.Mount("/api", tree2)
+
+	req, rer := http.NewRequest("GET", "/api/v2/users", nil)
 	if rer != nil {
 		b.Fatalf("with error: %v", rer)
 	}

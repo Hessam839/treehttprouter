@@ -3,7 +3,8 @@ package treehttprouter
 import "errors"
 
 var (
-	ErrorMethodDuplicate = errors.New("method defined")
+	ErrorMethodDuplicate  = errors.New("method defined")
+	ErrorMethodNotAllowed = errors.New("method not allowed")
 )
 
 type node struct {
@@ -85,8 +86,12 @@ func (n *node) search(path string) *node {
 	return nil
 }
 
-func (n *node) getHandler(method string) *Handler {
-	return n.body.handler[method]
+func (n *node) getHandler(method string) (*Handler, error) {
+	h, ok := n.body.handler[method]
+	if !ok {
+		return nil, ErrorMethodNotAllowed
+	}
+	return h, nil
 }
 
 func (n *node) availableNode() {

@@ -1,8 +1,8 @@
 package treehttprouter
 
 import (
+	"context"
 	"errors"
-	"net/http"
 	"strings"
 )
 
@@ -10,7 +10,7 @@ var (
 	MethodError = errors.New("wrong method")
 )
 
-type Handler func(r *http.Request) error
+type Handler func(ctx context.Context) error
 
 type Route struct {
 	handler map[string]*Handler

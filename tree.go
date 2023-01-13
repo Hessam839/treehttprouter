@@ -1,7 +1,9 @@
 package treehttprouter
 
 import (
+	"context"
 	"errors"
+	"net"
 	"net/http"
 )
 
@@ -22,14 +24,14 @@ type MuxTree struct {
 //var Tree *MuxTree
 
 func NewMux() *MuxTree {
-	var rnf Handler = func(r *http.Request) error {
+	var rnf Handler = func(ctx context.Context) error {
 		return ErrorRouteNotFound
 	}
 
 	n := newNode("*")
 	_ = n.addRoute("*", &rnf)
 
-	var mnf Handler = func(r *http.Request) error {
+	var mnf Handler = func(ctx context.Context) error {
 		return ErrorMethodNotAllowed
 	}
 
@@ -139,15 +141,18 @@ func (t *MuxTree) Use(handler Handler) {
 	t.middlewares = append(t.middlewares, &handler)
 }
 
-func (t *MuxTree) Serve(r *http.Request) error {
+func (t *MuxTree) Serve(c net.Conn, r *http.Request) error {
 	handler := t.match(r)
+	ctx := context.WithValue(context.Background(), "conn", c)
+	ctx = context.WithValue(ctx, "req", r)
 	for _, middleware := range t.middlewares {
 		h := *middleware
-		if err := h(r); err != nil {
+
+		if err := h(ctx); err != nil {
 			return err
 		}
 	}
-	return handler(r)
+	return handler(ctx)
 }
 
 func (t *MuxTree) Mount(path string, tree *MuxTree) {

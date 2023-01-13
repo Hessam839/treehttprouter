@@ -1,8 +1,8 @@
 package treehttprouter
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
-	"net/http"
 	"testing"
 )
 
@@ -14,8 +14,8 @@ func TestNewRouter(t *testing.T) {
 func TestAddHandler(t *testing.T) {
 	r := newRoute()
 
-	var h1 Handler = func(r *http.Request) error { return nil }
-	var h2 Handler = func(r *http.Request) error { return nil }
+	var h1 Handler = func(ctx context.Context) error { return nil }
+	var h2 Handler = func(ctx context.Context) error { return nil }
 
 	_ = r.addHandler("GET", &h1)
 

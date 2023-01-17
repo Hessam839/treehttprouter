@@ -1,8 +1,11 @@
 package treehttprouter
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 )
@@ -10,6 +13,10 @@ import (
 var (
 	ErrorRouteNotFound = errors.New("route not found")
 )
+
+type ServeHTTP interface {
+	Serve(conn net.Conn) error
+}
 
 type MuxTree struct {
 	root *node
@@ -141,10 +148,22 @@ func (t *MuxTree) Use(handler Handler) {
 	t.middlewares = append(t.middlewares, &handler)
 }
 
-func (t *MuxTree) Serve(c net.Conn, r *http.Request) error {
-	handler := t.match(r)
+func (t *MuxTree) Serve(c net.Conn) error {
+	var buff []byte
+	readLen, rer := c.Read(buff)
+	if rer != nil {
+		return fmt.Errorf("read from connection failed: %v", rer)
+	}
+
+	req, qer := http.ReadRequest(bufio.NewReader(bytes.NewReader(buff[:readLen])))
+	if qer != nil {
+		return fmt.Errorf("read http 1.1 request failed: %v", qer)
+	}
+
+	handler := t.match(req)
 	ctx := context.WithValue(context.Background(), "conn", c)
-	ctx = context.WithValue(ctx, "req", r)
+	ctx = context.WithValue(ctx, "req", req)
+
 	for _, middleware := range t.middlewares {
 		h := *middleware
 

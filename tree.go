@@ -149,7 +149,7 @@ func (t *MuxTree) Use(handler Handler) {
 }
 
 func (t *MuxTree) Serve(c net.Conn) error {
-	var buff []byte
+	buff := make([]byte, 1024)
 	readLen, rer := c.Read(buff)
 	if rer != nil {
 		return fmt.Errorf("read from connection failed: %v", rer)

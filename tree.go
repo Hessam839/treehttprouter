@@ -3,7 +3,6 @@ package treehttprouter
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -31,14 +30,14 @@ type MuxTree struct {
 //var Tree *MuxTree
 
 func NewMux() *MuxTree {
-	var rnf Handler = func(ctx context.Context) error {
+	var rnf Handler = func(ctx *Context) error {
 		return ErrorRouteNotFound
 	}
 
 	n := newNode("*")
 	_ = n.addRoute("*", &rnf)
 
-	var mnf Handler = func(ctx context.Context) error {
+	var mnf Handler = func(ctx *Context) error {
 		return ErrorMethodNotAllowed
 	}
 
@@ -161,8 +160,10 @@ func (t *MuxTree) Serve(c net.Conn) error {
 	}
 
 	handler := t.match(req)
-	ctx := context.WithValue(context.Background(), "conn", c)
-	ctx = context.WithValue(ctx, "req", req)
+	ctx, err := NewCtx(c)
+	if err != nil {
+		return fmt.Errorf("read request failed: %v", err)
+	}
 
 	for _, middleware := range t.middlewares {
 		h := *middleware

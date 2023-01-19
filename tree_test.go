@@ -2,35 +2,19 @@ package treehttprouter
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"log"
-	"net"
 	"net/http"
 	"testing"
 )
 
-func TestSplit(t *testing.T) {
-	p1 := "/api/v2/users"
-	p2 := ""
-	for {
-		p1, p2 = split(p1)
-		t.Logf("p1= %v, p2= %v", p1, p2)
-		if p2 == "" {
-			break
-		}
-		p1 = p2
-		p2 = ""
-	}
-}
-
 func TestTree(t *testing.T) {
 	tree := NewMux()
 
-	var v1 Handler = func(ctx context.Context) error { return nil }
+	var v1 Handler = func(ctx *Context) error { return nil }
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
 		t.Fatalf("cant create handler: %v", err)
 	}
@@ -57,7 +41,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestNodeSearch(t *testing.T) {
-	var v1 Handler = func(ctx context.Context) error { return nil }
+	var v1 Handler = func(ctx *Context) error { return nil }
 
 	n3 := newNode("admin")
 	err := n3.addRoute("GET", &v1)
@@ -95,9 +79,24 @@ func TestMatch(t *testing.T) {
 
 	handler := tree.match(req)
 	assert.NotNil(t, handler)
-	conn, _ := net.Pipe()
-	ctx := context.WithValue(context.Background(), "conn", conn)
-	ctx = context.WithValue(ctx, "req", req)
+
+	req, rer := http.NewRequest("GET", "/api/v1/users", bytes.NewReader([]byte(`{"name":"Hessam","age":42}`)))
+	if rer != nil {
+		t.Fatalf("with error: %v", rer)
+	}
+	req.Header.Add("X-Content-Type-Options", "JSON")
+
+	conn := NewMockConn()
+
+	var buff bytes.Buffer
+	if err := req.Write(&buff); err != nil {
+		t.Fatalf("reading from request failed:%v", err)
+	}
+	if _, err := conn.Write(buff.Bytes()); err != nil {
+		t.Fatalf("write fo connection failed: %v", err)
+	}
+
+	ctx, _ := NewCtx(conn)
 	err = handler(ctx)
 	if err != nil {
 		t.Fatalf("handler match error: %v", err)
@@ -117,9 +116,8 @@ func TestDisableRoute(t *testing.T) {
 	handler := tree.match(req)
 	assert.NotNil(t, handler)
 
-	conn, _ := net.Pipe()
-	ctx := context.WithValue(context.Background(), "conn", conn)
-	ctx = context.WithValue(ctx, "req", req)
+	conn := NewMockConn()
+	ctx, _ := NewCtx(conn)
 	err := handler(ctx)
 	assert.ErrorIs(t, err, ErrorRouteNotFound)
 }
@@ -127,18 +125,18 @@ func TestDisableRoute(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	tree, _ := CreateTree()
 
-	tree.Use(func(ctx context.Context) error {
-		r := ctx.Value("req").(*http.Request)
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
 		if r.Proto != "HTTP/1.1" {
 			return errors.New("protocol mismatch")
 		}
 		return nil
 	})
 
-	tree.Use(func(ctx context.Context) error {
-		r := ctx.Value("req").(*http.Request)
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
 		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
-			conn := ctx.Value("conn").(net.Conn)
+			conn := ctx.Connection
 			if err := conn.Close(); err != nil {
 				return fmt.Errorf("closing connection: %v", err)
 			}
@@ -171,7 +169,7 @@ func TestMountTree(t *testing.T) {
 	tree1, _ := CreateTree()
 
 	tree2 := NewMux()
-	if err := tree2.AddHandler("GET", "v2/users", func(ctx context.Context) error {
+	if err := tree2.AddHandler("GET", "v2/users", func(ctx *Context) error {
 		log.Println("Hello from v2/users")
 		return nil
 	}); err != nil {
@@ -192,7 +190,16 @@ func TestMountTree(t *testing.T) {
 	}
 	req.Header.Add("X-Content-Type-Options", "JSONP")
 
-	server, _ := net.Pipe()
+	server := NewMockConn()
+
+	var buff bytes.Buffer
+	if err := req.Write(&buff); err != nil {
+		t.Fatalf("reading from request failed:%v", err)
+	}
+	if _, err := server.Write(buff.Bytes()); err != nil {
+		t.Fatalf("write fo connection failed: %v", err)
+	}
+
 	err := tree1.Serve(server)
 	t.Logf("error is: %v", err)
 }
@@ -200,7 +207,7 @@ func TestMountTree(t *testing.T) {
 func CreateTree() (*MuxTree, error) {
 	tree := NewMux()
 
-	var v1 Handler = func(ctx context.Context) error { return nil }
+	var v1 Handler = func(ctx *Context) error { return nil }
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
 		return nil, fmt.Errorf("cant create handler: %v", err)
 	}
@@ -213,9 +220,9 @@ func CreateTree() (*MuxTree, error) {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
-	if err := tree.AddHandler("PUT", "/api/v1/users", func(ctx context.Context) error {
+	if err := tree.AddHandler("PUT", "/api/v1/users", func(ctx *Context) error {
 		user := &User{}
-		r := ctx.Value("req").(*http.Request)
+		r := ctx.Request
 		if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 			return err
 		}
@@ -229,8 +236,8 @@ func CreateTree() (*MuxTree, error) {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
-	if err := tree.AddHandler("POST", "/api/v1/products", func(ctx context.Context) error {
-		r := ctx.Value("req").(*http.Request)
+	if err := tree.AddHandler("POST", "/api/v1/products", func(ctx *Context) error {
+		r := ctx.Request
 		log.Printf("incoming req path: %v", r.URL.Path)
 		return nil
 	}); err != nil {
@@ -248,16 +255,16 @@ type User struct {
 func BenchmarkTree(b *testing.B) {
 	tree, _ := CreateTree()
 
-	tree.Use(func(ctx context.Context) error {
-		r := ctx.Value("req").(*http.Request)
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
 		if r.Proto != "HTTP1.1" {
 			return errors.New("protocol mismatch")
 		}
 		return nil
 	})
 
-	tree.Use(func(ctx context.Context) error {
-		r := ctx.Value("req").(*http.Request)
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
 		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
 			return errors.New("codec error")
 		}
@@ -267,7 +274,7 @@ func BenchmarkTree(b *testing.B) {
 	tree.DisablePath("/api/v1/users")
 
 	tree2 := NewMux()
-	if err := tree2.AddHandler("GET", "v2/users", func(ctx context.Context) error {
+	if err := tree2.AddHandler("GET", "v2/users", func(ctx *Context) error {
 		log.Println("Hello from v2/users")
 		return nil
 	}); err != nil {

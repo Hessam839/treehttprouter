@@ -3,10 +3,11 @@ package treehttprouter
 import "strings"
 
 func split(path string) (string, string) {
-	p := strings.Split(path, "/")
-	if len(p) == 0 {
+	if len(path) == 0 {
 		return "/", ""
 	}
+	p := strings.Split(path, "/")
+
 	if p[0] == "" {
 		return "/", strings.Join(p[1:], "/")
 	}

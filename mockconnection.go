@@ -1,20 +1,23 @@
 package treehttprouter
 
 import (
+	"context"
 	"io"
 	"net"
 	"time"
 )
 
 type myConn struct {
-	buff []byte
+	buff   []byte
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func (m *myConn) Read(b []byte) (n int, err error) {
 	err = nil
 
 	if len(b) == 0 {
-		return 0, nil
+		return 0, io.ErrShortBuffer
 	}
 
 	n = copy(b, m.buff[:len(m.buff)])
@@ -36,18 +39,18 @@ func (m *myConn) Close() error {
 }
 
 func (m *myConn) LocalAddr() net.Addr {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (m *myConn) RemoteAddr() net.Addr {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (m *myConn) SetDeadline(t time.Time) error {
-	//TODO implement me
-	panic("implement me")
+	ctx, cancel := context.WithDeadline(context.Background(), t)
+	m.ctx = ctx
+	m.cancel = cancel
+	return nil
 }
 
 func (m *myConn) SetReadDeadline(t time.Time) error {

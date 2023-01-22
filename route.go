@@ -9,7 +9,7 @@ var (
 	MethodError = errors.New("wrong method")
 )
 
-type Handler func(ctx *Context) error
+type Handler = func(ctx *Context) error
 
 type Route struct {
 	handler map[string]*Handler

@@ -200,10 +200,45 @@ func TestMountTree(t *testing.T) {
 	t.Logf("error is: %v", err)
 }
 
+var testRoute = []struct {
+	method string
+	path   string
+}{
+	{"*", "/"},
+	{"GET", "/api/v1/users"},
+	{"POST", "/api/v1/users"},
+	{"PUT", "/api/v1/users"},
+	{"GET", "/api/v1/products"},
+	{"POST", "/api/v1/products"},
+}
+
+func TestServer(t *testing.T) {
+	tree, err := CreateTree()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, p := range testRoute {
+		req, rer := http.NewRequest(p.method, p.path, bytes.NewReader([]byte(`{"name":"Hessam","age":42}`)))
+		if rer != nil {
+			t.Fatalf("with error: %v", rer)
+		}
+		req.Header.Add("X-Content-Type-Options", "JSONP")
+
+		ser := tree.Serve(req)
+		if ser != nil {
+			t.Logf("%v [cant server [%v] [%v]]", ser, p.method, p.path)
+		}
+	}
+}
+
 func CreateTree() (*MuxTree, error) {
 	tree := NewMux()
 
-	var v1 Handler = func(ctx *Context) error { return nil }
+	var v1 Handler = func(ctx *Context) error {
+		log.Printf("calling [%v] with [%v]", ctx.Request.Method, ctx.Request.URL.Path)
+		return nil
+	}
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
 		return nil, fmt.Errorf("cant create handler: %v", err)
 	}
@@ -240,6 +275,24 @@ func CreateTree() (*MuxTree, error) {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
+		log.Println("running middleware #1")
+		if r.Proto != "HTTP/1.1" {
+			return errors.New("protocol mismatch")
+		}
+		return nil
+	})
+
+	tree.Use(func(ctx *Context) error {
+		r := ctx.Request
+		log.Println("running middleware #2")
+		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
+			return errors.New("codec error")
+		}
+		return nil
+	})
+
 	return tree, nil
 }
 
@@ -251,21 +304,21 @@ type User struct {
 func BenchmarkTree(b *testing.B) {
 	tree, _ := CreateTree()
 
-	tree.Use(func(ctx *Context) error {
-		r := ctx.Request
-		if r.Proto != "HTTP1.1" {
-			return errors.New("protocol mismatch")
-		}
-		return nil
-	})
-
-	tree.Use(func(ctx *Context) error {
-		r := ctx.Request
-		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
-			return errors.New("codec error")
-		}
-		return nil
-	})
+	//tree.Use(func(ctx *Context) error {
+	//	r := ctx.Request
+	//	if r.Proto != "HTTP1.1" {
+	//		return errors.New("protocol mismatch")
+	//	}
+	//	return nil
+	//})
+	//
+	//tree.Use(func(ctx *Context) error {
+	//	r := ctx.Request
+	//	if r.Header.Get("X-Content-Type-Options") != "JSONP" {
+	//		return errors.New("codec error")
+	//	}
+	//	return nil
+	//})
 
 	tree.DisablePath("/api/v1/users")
 

@@ -206,10 +206,16 @@ var testRoute = []struct {
 }{
 	{"*", "/"},
 	{"GET", "/api/v1/users"},
-	{"POST", "/api/v1/users"},
 	{"PUT", "/api/v1/users"},
+	{"POST", "/api/v1/users"},
+	{"GET", "/api/v1/users"},
+	{"PUT", "/api/v1/users"},
+	{"DELETE", "/api/v1/users"},
 	{"GET", "/api/v1/products"},
 	{"POST", "/api/v1/products"},
+	{"GET", "/api/v1/products"},
+	{"PUT", "/api/v1/products"},
+	{"DELETE", "/api/v1/products"},
 }
 
 func TestServer(t *testing.T) {

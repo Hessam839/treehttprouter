@@ -1,11 +1,8 @@
 package treehttprouter
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 )
 
@@ -14,7 +11,7 @@ var (
 )
 
 type ServeHTTP interface {
-	Serve(conn net.Conn) error
+	Serve(req *http.Request) error
 }
 
 type MuxTree struct {
@@ -147,20 +144,20 @@ func (t *MuxTree) Use(handler Handler) {
 	t.middlewares = append(t.middlewares, &handler)
 }
 
-func (t *MuxTree) Serve(c net.Conn) error {
-	buff := make([]byte, 1024)
-	readLen, rer := c.Read(buff)
-	if rer != nil {
-		return fmt.Errorf("read from connection failed: %v", rer)
-	}
-
-	req, qer := http.ReadRequest(bufio.NewReader(bytes.NewReader(buff[:readLen])))
-	if qer != nil {
-		return fmt.Errorf("read http 1.1 request failed: %v", qer)
-	}
+func (t *MuxTree) Serve(req *http.Request) error {
+	//buff := make([]byte, 1024)
+	//readLen, rer := c.Read(buff)
+	//if rer != nil {
+	//	return fmt.Errorf("read from connection failed: %v", rer)
+	//}
+	//
+	//req, qer := http.ReadRequest(bufio.NewReader(bytes.NewReader(buff[:readLen])))
+	//if qer != nil {
+	//	return fmt.Errorf("read http 1.1 request failed: %v", qer)
+	//}
 
 	handler := t.match(req)
-	ctx, err := NewCtx(c)
+	ctx, err := NewCtx(req)
 	if err != nil {
 		return fmt.Errorf("read request failed: %v", err)
 	}

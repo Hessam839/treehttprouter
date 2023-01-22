@@ -8,14 +8,14 @@ import (
 )
 
 func TestCtx(t *testing.T) {
-	client := NewMockConn()
+	//client := NewMockConn()
 	req, _ := http.NewRequest("Get", "/login", bytes.NewReader([]byte(`{"name":"hesam","age":42}`)))
 
-	var buff bytes.Buffer
-	_ = req.Write(&buff)
-	_, _ = client.Write(buff.Bytes())
+	//var buff bytes.Buffer
+	//_ = req.Write(&buff)
+	//_, _ = client.Write(buff.Bytes())
 
-	ctx, err := NewCtx(client)
+	ctx, err := NewCtx(req)
 	if err != nil {
 		t.Fatalf("contextect creation failed: [%v]", err)
 	}

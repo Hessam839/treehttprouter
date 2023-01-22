@@ -86,17 +86,17 @@ func TestMatch(t *testing.T) {
 	}
 	req.Header.Add("X-Content-Type-Options", "JSON")
 
-	conn := NewMockConn()
+	//conn := NewMockConn()
+	//
+	//var buff bytes.Buffer
+	//if err := req.Write(&buff); err != nil {
+	//	t.Fatalf("reading from request failed:%v", err)
+	//}
+	//if _, err := conn.Write(buff.Bytes()); err != nil {
+	//	t.Fatalf("write fo connection failed: %v", err)
+	//}
 
-	var buff bytes.Buffer
-	if err := req.Write(&buff); err != nil {
-		t.Fatalf("reading from request failed:%v", err)
-	}
-	if _, err := conn.Write(buff.Bytes()); err != nil {
-		t.Fatalf("write fo connection failed: %v", err)
-	}
-
-	ctx, _ := NewCtx(conn)
+	ctx, _ := NewCtx(req)
 	err = handler(ctx)
 	if err != nil {
 		t.Fatalf("handler match error: %v", err)
@@ -116,8 +116,8 @@ func TestDisableRoute(t *testing.T) {
 	handler := tree.match(req)
 	assert.NotNil(t, handler)
 
-	conn := NewMockConn()
-	ctx, _ := NewCtx(conn)
+	//conn := NewMockConn()
+	ctx, _ := NewCtx(req)
 	err := handler(ctx)
 	assert.ErrorIs(t, err, ErrorRouteNotFound)
 }
@@ -136,10 +136,6 @@ func TestMiddleware(t *testing.T) {
 	tree.Use(func(ctx *Context) error {
 		r := ctx.Request
 		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
-			conn := ctx.Connection
-			if err := conn.Close(); err != nil {
-				return fmt.Errorf("closing connection: %v", err)
-			}
 			return errors.New("codec error")
 		}
 		return nil
@@ -151,17 +147,17 @@ func TestMiddleware(t *testing.T) {
 	}
 	req.Header.Add("X-Content-Type-Options", "JSON")
 
-	server := NewMockConn()
+	//server := NewMockConn()
+	//
+	//var buff bytes.Buffer
+	//if err := req.Write(&buff); err != nil {
+	//	t.Fatalf("reading from request failed:%v", err)
+	//}
+	//if _, err := server.Write(buff.Bytes()); err != nil {
+	//	t.Fatalf("write fo connection failed: %v", err)
+	//}
 
-	var buff bytes.Buffer
-	if err := req.Write(&buff); err != nil {
-		t.Fatalf("reading from request failed:%v", err)
-	}
-	if _, err := server.Write(buff.Bytes()); err != nil {
-		t.Fatalf("write fo connection failed: %v", err)
-	}
-
-	err := tree.Serve(server)
+	err := tree.Serve(req)
 	t.Logf("error is: %v", err)
 }
 
@@ -190,17 +186,17 @@ func TestMountTree(t *testing.T) {
 	}
 	req.Header.Add("X-Content-Type-Options", "JSONP")
 
-	server := NewMockConn()
+	//server := NewMockConn()
+	//
+	//var buff bytes.Buffer
+	//if err := req.Write(&buff); err != nil {
+	//	t.Fatalf("reading from request failed:%v", err)
+	//}
+	//if _, err := server.Write(buff.Bytes()); err != nil {
+	//	t.Fatalf("write fo connection failed: %v", err)
+	//}
 
-	var buff bytes.Buffer
-	if err := req.Write(&buff); err != nil {
-		t.Fatalf("reading from request failed:%v", err)
-	}
-	if _, err := server.Write(buff.Bytes()); err != nil {
-		t.Fatalf("write fo connection failed: %v", err)
-	}
-
-	err := tree1.Serve(server)
+	err := tree1.Serve(req)
 	t.Logf("error is: %v", err)
 }
 
@@ -295,17 +291,17 @@ func BenchmarkTree(b *testing.B) {
 	}
 	b.ReportAllocs()
 
-	server := NewMockConn()
-
-	var buff bytes.Buffer
-	if err := req.Write(&buff); err != nil {
-		b.Fatalf("reading from request failed:%v", err)
-	}
-	if _, err := server.Write(buff.Bytes()); err != nil {
-		b.Fatalf("write fo connection failed: %v", err)
-	}
+	//server := NewMockConn()
+	//
+	//var buff bytes.Buffer
+	//if err := req.Write(&buff); err != nil {
+	//	b.Fatalf("reading from request failed:%v", err)
+	//}
+	//if _, err := server.Write(buff.Bytes()); err != nil {
+	//	b.Fatalf("write fo connection failed: %v", err)
+	//}
 	for i := 0; i < b.N; i++ {
-		_ = tree.Serve(server)
+		_ = tree.Serve(req)
 	}
 
 }

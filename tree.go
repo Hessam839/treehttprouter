@@ -145,16 +145,6 @@ func (t *MuxTree) Use(handler Handler) {
 }
 
 func (t *MuxTree) Serve(req *http.Request) error {
-	//buff := make([]byte, 1024)
-	//readLen, rer := c.Read(buff)
-	//if rer != nil {
-	//	return fmt.Errorf("read from connection failed: %v", rer)
-	//}
-	//
-	//req, qer := http.ReadRequest(bufio.NewReader(bytes.NewReader(buff[:readLen])))
-	//if qer != nil {
-	//	return fmt.Errorf("read http 1.1 request failed: %v", qer)
-	//}
 
 	handler := t.match(req)
 	ctx, err := NewCtx(req)

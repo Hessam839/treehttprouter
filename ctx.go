@@ -17,9 +17,9 @@ type Context struct {
 func NewCtx(req *http.Request) (*Context, error) {
 	var b []byte
 	r := &Response{
-		headers:    make(map[string]string),
-		body:       bytes.NewBuffer(b),
-		statusCode: 0,
+		Headers:    make(map[string]string),
+		Body:       bytes.NewBuffer(b),
+		StatusCode: 0,
 	}
 	return &Context{
 		Request:  req,

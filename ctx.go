@@ -1,6 +1,7 @@
 package treehttprouter
 
 import (
+	"bytes"
 	"net/http"
 )
 
@@ -9,24 +10,19 @@ var (
 )
 
 type Context struct {
-	//Connection net.Conn
-	Request *http.Request
+	Request  *http.Request
+	Response *Response
 }
 
 func NewCtx(req *http.Request) (*Context, error) {
-	//buff := make([]byte, readBuff)
-	//readLen, rer := c.Read(buff)
-	//if rer != nil {
-	//	return nil, fmt.Errorf("read from connection failed: %v", rer)
-	//}
-	//
-	//req, qer := http.ReadRequest(bufio.NewReader(bytes.NewReader(buff[:readLen])))
-	//if qer != nil {
-	//	return nil, fmt.Errorf("read http 1.1 request failed: %v", qer)
-	//}
-
+	var b []byte
+	r := &Response{
+		headers:    make(map[string]string),
+		body:       bytes.NewBuffer(b),
+		statusCode: 0,
+	}
 	return &Context{
-		//Connection: c,
-		Request: req,
+		Request:  req,
+		Response: r,
 	}, nil
 }

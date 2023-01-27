@@ -156,8 +156,11 @@ func TestMiddleware(t *testing.T) {
 	//if _, err := server.Write(buff.Bytes()); err != nil {
 	//	t.Fatalf("write fo connection failed: %v", err)
 	//}
-
-	err := tree.Serve(req)
+	ctx, cer := NewCtx(req)
+	if cer != nil {
+		t.Logf("ctx: %v", cer)
+	}
+	err := tree.Serve(ctx)
 	t.Logf("error is: %v", err)
 }
 
@@ -195,8 +198,11 @@ func TestMountTree(t *testing.T) {
 	//if _, err := server.Write(buff.Bytes()); err != nil {
 	//	t.Fatalf("write fo connection failed: %v", err)
 	//}
-
-	err := tree1.Serve(req)
+	ctx, cer := NewCtx(req)
+	if cer != nil {
+		t.Logf("ctx: %v", cer)
+	}
+	err := tree1.Serve(ctx)
 	t.Logf("error is: %v", err)
 }
 
@@ -231,10 +237,15 @@ func TestServer(t *testing.T) {
 		}
 		req.Header.Add("X-Content-Type-Options", "JSONP")
 
-		ser := tree.Serve(req)
+		ctx, cer := NewCtx(req)
+		if cer != nil {
+			t.Logf("ctx: %v", cer)
+		}
+		ser := tree.Serve(ctx)
 		if ser != nil {
 			t.Logf("%v [cant server [%v] [%v]]", ser, p.method, p.path)
 		}
+		t.Logf("response: %v", ctx.Response)
 	}
 }
 
@@ -243,6 +254,11 @@ func CreateTree() (*MuxTree, error) {
 
 	var v1 Handler = func(ctx *Context) error {
 		log.Printf("calling [%v] with [%v]", ctx.Request.Method, ctx.Request.URL.Path)
+		ctx.Response.Body.Write([]byte("hello world"))
+		ctx.Response.StatusCode = 200
+		ctx.Response.Headers = map[string]string{
+			"Content-Type": "text/plain",
+		}
 		return nil
 	}
 	if err := tree.AddHandler("GET", "/", v1); err != nil {
@@ -359,8 +375,12 @@ func BenchmarkTree(b *testing.B) {
 	//if _, err := server.Write(buff.Bytes()); err != nil {
 	//	b.Fatalf("write fo connection failed: %v", err)
 	//}
+	ctx, cer := NewCtx(req)
+	if cer != nil {
+		b.Logf("ctx: %v", cer)
+	}
 	for i := 0; i < b.N; i++ {
-		_ = tree.Serve(req)
+		_ = tree.Serve(ctx)
 	}
 
 }

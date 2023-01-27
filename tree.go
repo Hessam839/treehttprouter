@@ -10,7 +10,7 @@ var (
 )
 
 type ServeHTTP interface {
-	Serve(req *http.Request) error
+	Serve(ctx *Context) error
 }
 
 type MuxTree struct {

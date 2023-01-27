@@ -1,9 +1,16 @@
 package treehttprouter
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 type Response struct {
-	headers    map[string]string
-	body       *bytes.Buffer
-	statusCode int
+	Headers    map[string]string
+	Body       *bytes.Buffer
+	StatusCode int
+}
+
+func (r Response) String() string {
+	return fmt.Sprintf("code=%d\nheaders: %v\nbody: %v", r.StatusCode, r.Headers, r.Body)
 }

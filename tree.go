@@ -2,7 +2,6 @@ package treehttprouter
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -144,13 +143,9 @@ func (t *MuxTree) Use(handler Handler) {
 	t.middlewares = append(t.middlewares, &handler)
 }
 
-func (t *MuxTree) Serve(req *http.Request) error {
+func (t *MuxTree) Serve(ctx *Context) error {
 
-	handler := t.match(req)
-	ctx, err := NewCtx(req)
-	if err != nil {
-		return fmt.Errorf("read request failed: %v", err)
-	}
+	handler := t.match(ctx.Request)
 
 	for _, middleware := range t.middlewares {
 		h := *middleware

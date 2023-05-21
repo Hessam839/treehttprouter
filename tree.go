@@ -159,5 +159,7 @@ func (t *MuxTree) Serve(ctx *Context) error {
 
 func (t *MuxTree) Mount(path string, tree *MuxTree) {
 	node := t.root.search(path)
-	node.addChild(tree.root)
+	for _, child := range tree.root.children {
+		node.addChild(child)
+	}
 }

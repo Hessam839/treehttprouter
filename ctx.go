@@ -11,6 +11,7 @@ var (
 
 type Context struct {
 	Request  *http.Request
+	Internal any
 	Response *Response
 }
 

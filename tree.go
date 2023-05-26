@@ -19,8 +19,6 @@ type MuxTree struct {
 	routeNotFound *node
 
 	methodNotAllowed *node
-
-	middlewares []*Handler
 }
 
 //var Tree *MuxTree
@@ -43,7 +41,6 @@ func NewMux() *MuxTree {
 	tree := &MuxTree{
 		routeNotFound:    n,
 		methodNotAllowed: n1,
-		middlewares:      make([]*Handler, 0),
 	}
 	return tree
 }
@@ -110,19 +107,19 @@ func (t *MuxTree) AddHandler(method string, path string, h Handler) error {
 	}
 }
 
-func (t *MuxTree) match(r *http.Request) Handler {
+func (t *MuxTree) match(r *http.Request) (Handler, *[]*Handler) {
 	path := r.URL.Path
-	node := t.root.search(path)
+	node, pathMiddlewares := t.root.searchWithMiddleware(path)
 	if node == nil || !node.isAvailable() {
 		handler, _ := t.routeNotFound.getHandler("*")
-		return *handler
+		return *handler, nil
 	}
 	handler, err := node.getHandler(r.Method)
 	if err != nil {
 		h, _ := t.methodNotAllowed.getHandler("*")
-		return *h
+		return *h, nil
 	}
-	return *handler
+	return *handler, pathMiddlewares
 }
 
 func (t *MuxTree) DisablePath(path string) {
@@ -139,15 +136,73 @@ func (t *MuxTree) EnablePath(path string) {
 	}
 }
 
-func (t *MuxTree) Use(handler Handler) {
-	t.middlewares = append(t.middlewares, &handler)
+func (t *MuxTree) Use(path string, handler Handler) error {
+	current, next := split(path)
+
+	if t.root == nil {
+		node := newNode(current)
+		t.root = node
+		if next == "" {
+			if err := node.addMiddleware(&handler); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+	//if current == "/" && next == "" {
+	//	if t.root == nil {
+	//		node := newNode(path)
+	//		err := node.addRoute(method, &h)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		t.root = node
+	//
+	//		return nil
+	//	}
+	//	return errors.New("root route defined")
+	//}
+	currentNode := t.root
+	child, remain := split(next)
+	for {
+		childNode := currentNode.haveChild(child)
+
+		//if leaf node
+		if remain == "" {
+			if childNode == nil {
+				newNode := newNode(child)
+				if err := newNode.addMiddleware(&handler); err != nil {
+					return err
+				}
+				currentNode.addChild(newNode)
+				return nil
+			}
+
+			err := childNode.addMiddleware(&handler)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if childNode == nil {
+			newNode := newNode(child)
+			currentNode.addChild(newNode)
+			currentNode = newNode
+			child, remain = split(remain)
+			continue
+		}
+
+		currentNode = childNode
+		child, remain = split(remain)
+	}
 }
 
 func (t *MuxTree) Serve(ctx *Context) error {
 
-	handler := t.match(ctx.Request)
+	handler, middlewares := t.match(ctx.Request)
 
-	for _, middleware := range t.middlewares {
+	for _, middleware := range *middlewares {
 		h := *middleware
 
 		if err := h(ctx); err != nil {

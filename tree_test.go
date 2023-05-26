@@ -77,7 +77,7 @@ func TestMatch(t *testing.T) {
 		t.Fatalf("with error: %v", err)
 	}
 
-	handler := tree.match(req)
+	handler, _ := tree.match(req)
 	assert.NotNil(t, handler)
 
 	req, rer := http.NewRequest("GET", "/api/v1/users", bytes.NewReader([]byte(`{"name":"Hessam","age":42}`)))
@@ -113,7 +113,7 @@ func TestDisableRoute(t *testing.T) {
 		t.Fatalf("with error: %v", rer)
 	}
 
-	handler := tree.match(req)
+	handler, _ := tree.match(req)
 	assert.NotNil(t, handler)
 
 	//conn := NewMockConn()
@@ -125,7 +125,7 @@ func TestDisableRoute(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	tree, _ := CreateTree()
 
-	tree.Use(func(ctx *Context) error {
+	tree.Use("/api/v1/users", func(ctx *Context) error {
 		r := ctx.Request
 		if r.Proto != "HTTP/1.1" {
 			return errors.New("protocol mismatch")
@@ -133,7 +133,7 @@ func TestMiddleware(t *testing.T) {
 		return nil
 	})
 
-	tree.Use(func(ctx *Context) error {
+	tree.Use("/api/v1/users", func(ctx *Context) error {
 		r := ctx.Request
 		if r.Header.Get("X-Content-Type-Options") != "JSONP" {
 			return errors.New("codec error")
@@ -297,7 +297,7 @@ func CreateTree() (*MuxTree, error) {
 		return nil, fmt.Errorf("cant create handler %v", err)
 	}
 
-	tree.Use(func(ctx *Context) error {
+	tree.Use("/api/v1/users", func(ctx *Context) error {
 		r := ctx.Request
 		log.Println("running middleware #1")
 		if r.Proto != "HTTP/1.1" {
@@ -306,7 +306,7 @@ func CreateTree() (*MuxTree, error) {
 		return nil
 	})
 
-	tree.Use(func(ctx *Context) error {
+	tree.Use("/api/v1/users", func(ctx *Context) error {
 		r := ctx.Request
 		log.Println("running middleware #2")
 		if r.Header.Get("X-Content-Type-Options") != "JSONP" {

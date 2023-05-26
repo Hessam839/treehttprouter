@@ -202,11 +202,13 @@ func (t *MuxTree) Serve(ctx *Context) error {
 
 	handler, middlewares := t.match(ctx.Request)
 
-	for _, middleware := range *middlewares {
-		h := *middleware
+	if middlewares != nil {
+		for _, middleware := range *middlewares {
+			h := *middleware
 
-		if err := h(ctx); err != nil {
-			return err
+			if err := h(ctx); err != nil {
+				return err
+			}
 		}
 	}
 	return handler(ctx)
